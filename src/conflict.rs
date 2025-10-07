@@ -6,6 +6,7 @@ pub trait ConflictResolver {
     fn resolve(&self, a: &Item, b: &Item, doc: &HashMap<ID, Item>) -> Ordering;
 }
 
+#[derive(Debug)]
 pub struct YataResolver;
 
 impl ConflictResolver for YataResolver {
