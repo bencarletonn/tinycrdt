@@ -22,4 +22,18 @@ impl<R: ConflictResolver> Doc<R> {
     }
 }
 
-// impl Crdt & SequenceCrdt on Doc
+// TODO
+impl<R: ConflictResolver> Crdt for Doc<R> {
+    type Update = Vec<Item>;
+
+    fn apply(&mut self, update: Self::Update) {}
+    fn diff(&self, remote: &StateVector) -> Self::Update {}
+    fn state_vector(&self) -> StateVector {}
+}
+
+// TODO
+impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
+    fn insert(&mut self, pos: usize, content: &str) {}
+    fn delete(&mut self, pos: usize, len: usize) {}
+    fn value(&self) -> String {}
+}
