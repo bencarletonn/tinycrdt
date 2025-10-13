@@ -13,3 +13,8 @@ pub trait SequenceCrdt {
     fn delete(&mut self, pos: usize, len: usize);
     fn value(&self) -> String;
 }
+
+pub trait BinaryEncode: Sized {
+    fn encode(&self) -> Vec<u8>;
+    fn decode(bytes: &[u8]) -> Option<Self>;
+}
