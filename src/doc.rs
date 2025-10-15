@@ -24,6 +24,16 @@ impl Doc<YataResolver> {
             resolver: YataResolver,
         }
     }
+
+    /// Minimal helper to insert a linked item sequence manually.
+    /// TODO: remove this when `apply()` is available.
+    fn insert_test_item(&mut self, item: Item) {
+        let id = item.id;
+        if self.head.is_none() {
+            self.head = Some(id);
+        }
+        self.items.insert(id, item);
+    }
 }
 
 impl<R: ConflictResolver> Doc<R> {
@@ -39,7 +49,19 @@ impl<R: ConflictResolver> Doc<R> {
         }
     }
 
-    fn next_id(&mut self) -> ID {}
+    /// Generates a new unique identifier for the next local operation.
+    ///
+    /// Increments the local clock and returns an [`ID`] combining this document's
+    /// `client_id` and the updated clock value.
+    ///
+    /// Ensures all locally created items have monotonically increasing, unique IDs.
+    fn next_id(&mut self) -> ID {
+        self.clock += 1;
+        return ID {
+            client: self.client_id,
+            clock: self.clock,
+        }
+    }
 
     /// Finds the insertion position in the linked list for a given character position.
     ///
@@ -91,7 +113,9 @@ impl<R: ConflictResolver> Crdt for Doc<R> {
     type Update = Vec<Item>;
 
     fn apply(&mut self, update: Self::Update) {}
-    fn diff(&self, remote: &StateVector) -> Self::Update {}
+    fn diff(&self, remote: &StateVector) -> Self::Update {
+       Vec::<Item>::new()
+    }
     fn state_vector(&self) -> StateVector { self.state_vector.clone() }
 }
 
@@ -101,7 +125,9 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
 
     }
     fn delete(&mut self, pos: usize, len: usize) {}
-    fn value(&self) -> String {}
+    fn value(&self) -> String {
+        "TODO".into()
+    }
 }
 
 #[cfg(test)]
@@ -112,13 +138,27 @@ mod tests {
     fn find_pos_in_empty_doc() {
         let doc = Doc::new(1);
         let (left, right) = doc.find_pos(0);
-        assert!(left.is_none() && right.is_none());
+        assert!(left.is_none());
+        assert!(right.is_none());
     }
 
     #[test]
     fn find_pos_at_start() {
-        // Need to implement apply as updates need to be applied.
-        // left will always be None, right will point to first item
+        let mut doc = Doc::new(1);
+        doc.insert_test_item(Item {
+            id: ID {
+                client: 1,
+                clock: 0,
+            },
+            left: None,
+            right: None,
+            content: "hello".into(),
+            is_deleted: false,
+        });
+
+        let (left, right) = doc.find_pos(0);
+        assert!(left.is_none());
+        assert!(right.is_some());
     }
 
     #[test]
