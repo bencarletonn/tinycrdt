@@ -89,3 +89,51 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
     fn delete(&mut self, pos: usize, len: usize) {}
     fn value(&self) -> String {}
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::YataResolver;
+
+    #[test]
+    fn find_pos_in_empty_doc() {
+        let doc = Doc::new(1, YataResolver);
+        let (left, right) = doc.find_pos(0);
+        assert!(left.is_none() && right.is_none());
+    }
+
+    #[test]
+    fn find_pos_at_start() {
+        // Need to implement apply as updates need to be applied.
+        // left will always be None, right will point to first item
+    }
+
+    #[test]
+    fn find_pos_at_end() {
+    }
+
+
+    #[test]
+    fn find_pos_in_middle_of_item() {
+        // The find_pos shouldn't split the item, the insert
+        // algorithm will do that
+    }
+
+    #[test]
+    fn find_pos_between_items() {
+    }
+
+    #[test]
+    fn find_pos_skips_deleted_items() {
+    }
+
+    #[test]
+    fn test_find_pos_with_unicode() {
+        // We use chars().count() 
+    }
+
+    #[test]
+    fn find_pos_all_items_deleted() {
+    }
+
+}
