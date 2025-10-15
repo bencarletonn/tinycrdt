@@ -1,6 +1,6 @@
+use crate::{ID, Item};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use crate::{ID, Item};
 
 pub trait ConflictResolver {
     fn resolve(&self, a: &Item, b: &Item, doc: &HashMap<ID, Item>) -> Ordering;

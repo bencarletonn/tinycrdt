@@ -1,5 +1,5 @@
+use crate::{ConflictResolver, Crdt, ID, Item, SequenceCrdt, StateVector, YataResolver};
 use std::collections::HashMap;
-use crate::{ConflictResolver, Crdt, Item, SequenceCrdt, StateVector, YataResolver, ID};
 
 #[derive(Debug)]
 pub struct Doc<R: ConflictResolver = YataResolver> {
@@ -60,7 +60,7 @@ impl<R: ConflictResolver> Doc<R> {
         return ID {
             client: self.client_id,
             clock: self.clock,
-        }
+        };
     }
 
     /// Finds the insertion position in the linked list for a given character position.
@@ -107,22 +107,23 @@ impl<R: ConflictResolver> Doc<R> {
     fn resolve_pending(&mut self) {}
 }
 
-// impl Iter 
+// impl Iter
 
 impl<R: ConflictResolver> Crdt for Doc<R> {
     type Update = Vec<Item>;
 
     fn apply(&mut self, update: Self::Update) {}
     fn diff(&self, remote: &StateVector) -> Self::Update {
-       Vec::<Item>::new()
+        Vec::<Item>::new()
     }
-    fn state_vector(&self) -> StateVector { self.state_vector.clone() }
+    fn state_vector(&self) -> StateVector {
+        self.state_vector.clone()
+    }
 }
 
 impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
     fn insert(&mut self, pos: usize, text: &str) {
         // find_pos
-
     }
     fn delete(&mut self, pos: usize, len: usize) {}
     fn value(&self) -> String {
@@ -162,9 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn find_pos_at_end() {
-    }
-
+    fn find_pos_at_end() {}
 
     #[test]
     fn find_pos_in_middle_of_item() {
@@ -173,20 +172,16 @@ mod tests {
     }
 
     #[test]
-    fn find_pos_between_items() {
-    }
+    fn find_pos_between_items() {}
 
     #[test]
-    fn find_pos_skips_deleted_items() {
-    }
+    fn find_pos_skips_deleted_items() {}
 
     #[test]
     fn test_find_pos_with_unicode() {
-        // We use chars().count() 
+        // We use chars().count()
     }
 
     #[test]
-    fn find_pos_all_items_deleted() {
-    }
-
+    fn find_pos_all_items_deleted() {}
 }
