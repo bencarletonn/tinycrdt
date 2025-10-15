@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use crate::{ConflictResolver, Crdt, SequenceCrdt, ID, Item, StateVector};
+use crate::{ConflictResolver, Crdt, Item, SequenceCrdt, StateVector, YataResolver, ID};
 
 #[derive(Debug)]
-pub struct Doc<R: ConflictResolver> {
+pub struct Doc<R: ConflictResolver = YataResolver> {
     pub client_id: u64,
     pub clock: u64,
     pub items: HashMap<ID, Item>,
@@ -12,8 +12,22 @@ pub struct Doc<R: ConflictResolver> {
     pub resolver: R,
 }
 
+impl Doc<YataResolver> {
+    pub fn new(client_id: u64) -> Self {
+        Self {
+            client_id,
+            clock: 0,
+            items: HashMap::new(),
+            pending: Vec::new(),
+            state_vector: HashMap::new(),
+            head: None,
+            resolver: YataResolver,
+        }
+    }
+}
+
 impl<R: ConflictResolver> Doc<R> {
-    pub fn new (client_id: u64, resolver: R) -> Self {
+    pub fn with_resolver(client_id: u64, resolver: R) -> Self {
         Self {
             client_id,
             clock: 0,
@@ -93,11 +107,10 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::YataResolver;
 
     #[test]
     fn find_pos_in_empty_doc() {
-        let doc = Doc::new(1, YataResolver);
+        let doc = Doc::new(1);
         let (left, right) = doc.find_pos(0);
         assert!(left.is_none() && right.is_none());
     }
