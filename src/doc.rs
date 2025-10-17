@@ -138,7 +138,6 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
 mod tests {
     use super::*;
 
-    
     // Helper function to create test IDs
     fn id(client: u64, clock: u64) -> ID {
         ID { client, clock }
@@ -216,8 +215,8 @@ mod tests {
             is_deleted: false,
         });
 
-        // Position 5 should have one item to the right, with 
-        // an offset of 5, indicating the right item will need 
+        // Position 5 should have one item to the right, with
+        // an offset of 5, indicating the right item will need
         // to be split on insertion
         let (left, right, offset) = doc.find_pos(5);
         assert!(left.is_none());
@@ -303,7 +302,7 @@ mod tests {
         assert_eq!(left, Some(id(1, 0)));
         assert_eq!(right, Some(id(1, 1)));
         assert_eq!(offset, 1);
-        
+
         // Position 7 should be at the end
         let (left, right, offset) = doc.find_pos(7);
         assert_eq!(left, Some(id(1, 1)));
@@ -339,19 +338,19 @@ mod tests {
             is_deleted: true,
         });
 
-        // Position 5 should be at the start 
+        // Position 5 should be at the start
         let (left, right, offset) = doc.find_pos(5);
         assert_eq!(left, None);
         assert_eq!(right, None);
         assert_eq!(offset, 0);
 
-        // Position 10 should be at the start 
+        // Position 10 should be at the start
         let (left, right, offset) = doc.find_pos(10);
         assert_eq!(left, None);
         assert_eq!(right, None);
         assert_eq!(offset, 0);
 
-        // Position 15 should be at the start 
+        // Position 15 should be at the start
         let (left, right, offset) = doc.find_pos(15);
         assert_eq!(left, None);
         assert_eq!(right, None);
