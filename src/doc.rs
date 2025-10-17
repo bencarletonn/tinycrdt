@@ -49,18 +49,16 @@ impl<R: ConflictResolver> Doc<R> {
         }
     }
 
-    /// Generates a new unique identifier for the next local operation.
+    /// Generates a new unique identifier for a local operation.
     ///
-    /// Increments the local clock and returns an [`ID`] combining this document's
-    /// `client_id` and the previous clock value.
-    ///
-    /// Ensures all locally created items have monotonically increasing, unique IDs.
-    fn next_id(&mut self) -> ID {
+    /// Returns an [`ID`] with the current clock value, then advances the clock
+    /// by the character count of `text`.
+    fn next_id(&mut self, text: &str) -> ID {
         let id = ID {
             client: self.client_id,
             clock: self.clock,
         };
-        self.clock += 1;
+        self.clock += text.chars().count() as u64;
         id
     }
 
@@ -126,7 +124,7 @@ impl<R: ConflictResolver> Crdt for Doc<R> {
 
 impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
     fn insert(&mut self, pos: usize, text: &str) {
-        // find_pos
+        let (left_id, right_id, offset) = self.find_pos(pos);
     }
     fn delete(&mut self, pos: usize, len: usize) {}
     fn value(&self) -> String {
@@ -146,21 +144,25 @@ mod tests {
     #[test]
     fn next_id_clock_starts_at_0() {
         let mut doc = Doc::new(1);
-        let next_id = doc.next_id();
+        let next_id = doc.next_id("");
+
         assert!(next_id.clock == 0);
     }
 
     #[test]
-    fn next_id_clock_one_less_than_doc_clock() {
+    fn next_id_advanced_clock_by_text_length() {
         let mut doc = Doc::new(1);
-        let next_id = doc.next_id();
-        assert!(next_id.clock == doc.clock - 1)
+        let next_id = doc.next_id("abc");
+
+        assert_eq!(doc.clock, 3);
+        assert!(next_id.clock == doc.clock - 3);
     }
 
     #[test]
     fn find_pos_in_empty_doc() {
         let doc = Doc::new(1);
         let (left, right, offset) = doc.find_pos(0);
+
         assert!(left.is_none());
         assert!(right.is_none());
         assert!(offset == 0);
@@ -169,6 +171,7 @@ mod tests {
     #[test]
     fn find_pos_at_start() {
         let mut doc = Doc::new(1);
+
         doc.insert_test_item(Item {
             id: ID {
                 client: 1,
@@ -189,12 +192,14 @@ mod tests {
     #[test]
     fn find_pos_at_end() {
         let mut doc = Doc::new(1);
-        let first_id = doc.next_id();
+        let content = "Hello world!";
+        let first_id = doc.next_id(&content);
+
         doc.insert_test_item(Item {
             id: first_id,
             left: None,
             right: None,
-            content: "Hello world!".to_owned(),
+            content: content.to_owned(),
             is_deleted: false,
         });
 
@@ -206,12 +211,14 @@ mod tests {
     #[test]
     fn find_pos_in_middle_of_item() {
         let mut doc = Doc::new(1);
-        let first_id = doc.next_id();
+        let content = "This is all one item!";
+        let first_id = doc.next_id(content);
+
         doc.insert_test_item(Item {
             id: first_id,
             left: None,
             right: None,
-            content: "This is all one item!".to_owned(),
+            content: content.to_owned(),
             is_deleted: false,
         });
 
@@ -227,46 +234,52 @@ mod tests {
     #[test]
     fn find_pos_between_items() {
         let mut doc = Doc::new(1);
-        let first_id = doc.next_id();
-        let second_id = doc.next_id();
+        let first_content = "First Item";
+        let first_id = doc.next_id(first_content);
+        let second_content = "Second Item";
+        let second_id = doc.next_id(second_content);
+
         doc.insert_test_item(Item {
             id: first_id,
             left: None,
             right: Some(second_id),
-            content: "First Item".to_owned(),
+            content: first_content.to_owned(),
             is_deleted: false,
         });
         doc.insert_test_item(Item {
             id: second_id,
             left: Some(first_id),
             right: None,
-            content: "Second Item".to_owned(),
+            content: second_content.to_owned(),
             is_deleted: false,
         });
 
         let (left, right, offset) = doc.find_pos(10);
         assert_eq!(left, Some(id(1, 0)));
-        assert_eq!(right, Some(id(1, 1)));
+        assert_eq!(right, Some(id(1, 10)));
         assert_eq!(offset, 0);
     }
 
     #[test]
     fn find_pos_skips_deleted_items() {
         let mut doc = Doc::new(1);
-        let first_id = doc.next_id();
-        let second_id = doc.next_id();
+        let first_content = "First Item";
+        let first_id = doc.next_id(first_content);
+        let second_content = "Second Item";
+        let second_id = doc.next_id(second_content);
+
         doc.insert_test_item(Item {
             id: first_id,
             left: None,
             right: Some(second_id),
-            content: "First Item".to_owned(),
+            content: first_content.to_owned(),
             is_deleted: false,
         });
         doc.insert_test_item(Item {
             id: second_id,
             left: Some(first_id),
             right: None,
-            content: "Second Item".to_owned(),
+            content: second_content.to_owned(),
             is_deleted: true,
         });
 
@@ -280,32 +293,35 @@ mod tests {
     #[test]
     fn test_find_pos_with_unicode() {
         let mut doc = Doc::new(1);
-        let first_id = doc.next_id();
-        let second_id = doc.next_id();
+        let first_content = "hello";
+        let first_id = doc.next_id(first_content);
+        let second_content = "🦀🦀";
+        let second_id = doc.next_id(second_content);
+
         doc.insert_test_item(Item {
             id: first_id,
             left: None,
             right: Some(second_id),
-            content: "hello".to_owned(),
+            content: first_content.to_owned(),
             is_deleted: false,
         });
         doc.insert_test_item(Item {
             id: second_id,
             left: Some(first_id),
             right: None,
-            content: "🦀🦀".to_owned(),
+            content: second_content.to_owned(),
             is_deleted: false,
         });
 
         // Position 6 should be in the emoji item
         let (left, right, offset) = doc.find_pos(6);
         assert_eq!(left, Some(id(1, 0)));
-        assert_eq!(right, Some(id(1, 1)));
+        assert_eq!(right, Some(id(1, 5)));
         assert_eq!(offset, 1);
 
         // Position 7 should be at the end
         let (left, right, offset) = doc.find_pos(7);
-        assert_eq!(left, Some(id(1, 1)));
+        assert_eq!(left, Some(id(1, 5)));
         assert_eq!(right, None);
         assert_eq!(offset, 0);
     }
@@ -313,28 +329,32 @@ mod tests {
     #[test]
     fn find_pos_all_items_deleted() {
         let mut doc = Doc::new(1);
-        let first_id = doc.next_id();
-        let second_id = doc.next_id();
-        let third_id = doc.next_id();
+        let first_content = "First Item";
+        let first_id = doc.next_id(first_content);
+        let second_content = "Second Item";
+        let second_id = doc.next_id(second_content);
+        let third_content = "Third Item";
+        let third_id = doc.next_id(third_content);
+
         doc.insert_test_item(Item {
             id: first_id,
             left: None,
             right: Some(second_id),
-            content: "First Item".to_owned(),
+            content: first_content.to_owned(),
             is_deleted: true,
         });
         doc.insert_test_item(Item {
             id: second_id,
             left: Some(first_id),
             right: Some(third_id),
-            content: "Second Item".to_owned(),
+            content: second_content.to_owned(),
             is_deleted: true,
         });
         doc.insert_test_item(Item {
             id: third_id,
             left: Some(second_id),
             right: None,
-            content: "Third Item".to_owned(),
+            content: third_content.to_owned(),
             is_deleted: true,
         });
 
