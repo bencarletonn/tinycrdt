@@ -52,21 +52,23 @@ impl<R: ConflictResolver> Doc<R> {
     /// Generates a new unique identifier for the next local operation.
     ///
     /// Increments the local clock and returns an [`ID`] combining this document's
-    /// `client_id` and the updated clock value.
+    /// `client_id` and the previous clock value.
     ///
     /// Ensures all locally created items have monotonically increasing, unique IDs.
     fn next_id(&mut self) -> ID {
-        self.clock += 1;
-        return ID {
+        let id = ID {
             client: self.client_id,
             clock: self.clock,
         };
+        self.clock += 1;
+        id 
     }
 
     /// Finds the insertion position in the linked list for a given character position.
     ///
     /// Traverses the list while skipping deleted items, returning the IDs of the
-    /// items that should surround the insertion point.
+    /// items that should surround the insertion point and the offset at which the
+    /// insertion should occur in the Item if it requires splitting
     ///
     /// # Arguments
     ///
@@ -74,10 +76,10 @@ impl<R: ConflictResolver> Doc<R> {
     ///
     /// # Returns
     ///
-    /// A tuple `(left, right)` where `left` is the item before the insertion point
+    /// A tuple `(left, right, right)` where `left` is the item before the insertion point
     /// and `right` is the item at or after it. Either can be `None` if inserting at
     /// the beginning or end of the list.
-    fn find_pos(&self, pos: usize) -> (Option<ID>, Option<ID>) {
+    fn find_pos(&self, pos: usize) -> (Option<ID>, Option<ID>, usize) {
         let mut index = 0;
         let mut left = None;
         let mut current = self.head;
@@ -90,8 +92,9 @@ impl<R: ConflictResolver> Doc<R> {
             }
 
             let len = item.content.chars().count();
-            if index + len >= pos {
-                return (left, Some(id));
+            if index + len > pos {
+                let offset = pos - index;
+                return (left, Some(id), offset);
             }
 
             index += len;
@@ -99,7 +102,7 @@ impl<R: ConflictResolver> Doc<R> {
             current = item.right;
         }
 
-        (left, None)
+        (left, None, 0)
     }
 
     fn try_link(&mut self, item: Item) {}
@@ -135,20 +138,28 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
 mod tests {
     use super::*;
 
+
     #[test]
-    fn next_id_clocks_remain_in_sync() {
+    fn next_id_clock_starts_at_0() {
         let mut doc = Doc::new(1);
         let next_id = doc.next_id();
-        assert!(next_id.clock == doc.clock);
-        assert!(next_id.client == doc.client_id);
+        assert!(next_id.clock == 0);
+    }
+
+    #[test]
+    fn next_id_clock_one_less_than_doc_clock() {
+        let mut doc = Doc::new(1);
+        let next_id = doc.next_id();
+        assert!(next_id.clock == doc.clock - 1)
     }
 
     #[test]
     fn find_pos_in_empty_doc() {
         let doc = Doc::new(1);
-        let (left, right) = doc.find_pos(0);
+        let (left, right, offset) = doc.find_pos(0);
         assert!(left.is_none());
         assert!(right.is_none());
+        assert!(offset == 0);
     }
 
     #[test]
@@ -159,28 +170,80 @@ mod tests {
                 client: 1,
                 clock: 0,
             },
-            left: None,
+            left: doc.head,
             right: None,
-            content: "hello".into(),
+            content: "hello".to_owned(),
             is_deleted: false,
         });
 
-        let (left, right) = doc.find_pos(0);
+        let (left, right, offset) = doc.find_pos(0);
         assert!(left.is_none());
         assert!(right.is_some());
+        assert!(offset == 0);
     }
 
     #[test]
-    fn find_pos_at_end() {}
+    fn find_pos_at_end() {
+        let mut doc = Doc::new(1);
+        let first_id = doc.next_id();
+        doc.insert_test_item(Item {
+            id: first_id ,
+            left: None,
+            right: None,
+            content: "Hello world!".to_owned(),
+            is_deleted: false,
+        });
+
+        let (left, right, offset) = doc.find_pos(12);
+        assert!(left.is_some());
+        assert!(right.is_none());
+    }
 
     #[test]
     fn find_pos_in_middle_of_item() {
-        // The find_pos shouldn't split the item, the insert
-        // algorithm will do that
+        let mut doc = Doc::new(1);
+        let first_id = doc.next_id();
+        doc.insert_test_item(Item {
+            id: first_id ,
+            left: None,
+            right: None,
+            content: "This is all one item!".to_owned(),
+            is_deleted: false,
+        });
+
+        let (left, right, offset) = doc.find_pos(5);
+        assert!(left.is_none());
+        assert!(right.is_some());
+        // When we obtain an offset > 0, we know where to split the right item
+        assert!(offset == 5);
     }
 
     #[test]
-    fn find_pos_between_items() {}
+    fn find_pos_between_items() {
+         let mut doc = Doc::new(1);
+        let first_id = doc.next_id();
+        let second_id = doc.next_id();
+        doc.insert_test_item(Item {
+            id: first_id,
+            left: None,
+            right: Some(second_id),
+            content: "First Item".to_owned(),
+            is_deleted: false,
+        });
+        doc.insert_test_item(Item {
+            id: second_id,
+            left: Some(first_id),
+            right: None,
+            content: "Second Item".to_owned(),
+            is_deleted: false,
+
+        });
+
+        let (left, right, offset) = doc.find_pos(10);
+        assert!(left.is_some());
+        assert!(right.is_some());
+        assert!(offset == 0);
+    }
 
     #[test]
     fn find_pos_skips_deleted_items() {}
