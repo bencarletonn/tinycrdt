@@ -138,6 +138,12 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
 mod tests {
     use super::*;
 
+    
+    // Helper function to create test IDs
+    fn id(client: u64, clock: u64) -> ID {
+        ID { client, clock }
+    }
+
     #[test]
     fn next_id_clock_starts_at_0() {
         let mut doc = Doc::new(1);
@@ -193,7 +199,7 @@ mod tests {
             is_deleted: false,
         });
 
-        let (left, right, offset) = doc.find_pos(12);
+        let (left, right, _) = doc.find_pos(12);
         assert!(left.is_some());
         assert!(right.is_none());
     }
@@ -210,10 +216,12 @@ mod tests {
             is_deleted: false,
         });
 
+        // Position 5 should have one item to the right, with 
+        // an offset of 5, indicating the right item will need 
+        // to be split on insertion
         let (left, right, offset) = doc.find_pos(5);
         assert!(left.is_none());
         assert!(right.is_some());
-        // When we obtain an offset > 0, we know where to split the right item
         assert!(offset == 5);
     }
 
@@ -238,19 +246,115 @@ mod tests {
         });
 
         let (left, right, offset) = doc.find_pos(10);
-        assert!(left.is_some());
-        assert!(right.is_some());
-        assert!(offset == 0);
+        assert_eq!(left, Some(id(1, 0)));
+        assert_eq!(right, Some(id(1, 1)));
+        assert_eq!(offset, 0);
     }
 
     #[test]
-    fn find_pos_skips_deleted_items() {}
+    fn find_pos_skips_deleted_items() {
+        let mut doc = Doc::new(1);
+        let first_id = doc.next_id();
+        let second_id = doc.next_id();
+        doc.insert_test_item(Item {
+            id: first_id,
+            left: None,
+            right: Some(second_id),
+            content: "First Item".to_owned(),
+            is_deleted: false,
+        });
+        doc.insert_test_item(Item {
+            id: second_id,
+            left: Some(first_id),
+            right: None,
+            content: "Second Item".to_owned(),
+            is_deleted: true,
+        });
+
+        // Position 10 should be right to the first item
+        let (left, right, offset) = doc.find_pos(10);
+        assert_eq!(left, Some(id(1, 0)));
+        assert!(right.is_none());
+        assert_eq!(offset, 0);
+    }
 
     #[test]
     fn test_find_pos_with_unicode() {
-        // We use chars().count()
+        let mut doc = Doc::new(1);
+        let first_id = doc.next_id();
+        let second_id = doc.next_id();
+        doc.insert_test_item(Item {
+            id: first_id,
+            left: None,
+            right: Some(second_id),
+            content: "hello".to_owned(),
+            is_deleted: false,
+        });
+        doc.insert_test_item(Item {
+            id: second_id,
+            left: Some(first_id),
+            right: None,
+            content: "🦀🦀".to_owned(),
+            is_deleted: false,
+        });
+
+        // Position 6 should be in the emoji item
+        let (left, right, offset) = doc.find_pos(6);
+        assert_eq!(left, Some(id(1, 0)));
+        assert_eq!(right, Some(id(1, 1)));
+        assert_eq!(offset, 1);
+        
+        // Position 7 should be at the end
+        let (left, right, offset) = doc.find_pos(7);
+        assert_eq!(left, Some(id(1, 1)));
+        assert_eq!(right, None);
+        assert_eq!(offset, 0);
     }
 
     #[test]
-    fn find_pos_all_items_deleted() {}
+    fn find_pos_all_items_deleted() {
+        let mut doc = Doc::new(1);
+        let first_id = doc.next_id();
+        let second_id = doc.next_id();
+        let third_id = doc.next_id();
+        doc.insert_test_item(Item {
+            id: first_id,
+            left: None,
+            right: Some(second_id),
+            content: "First Item".to_owned(),
+            is_deleted: true,
+        });
+        doc.insert_test_item(Item {
+            id: second_id,
+            left: Some(first_id),
+            right: Some(third_id),
+            content: "Second Item".to_owned(),
+            is_deleted: true,
+        });
+        doc.insert_test_item(Item {
+            id: third_id,
+            left: Some(second_id),
+            right: None,
+            content: "Third Item".to_owned(),
+            is_deleted: true,
+        });
+
+        // Position 5 should be at the start 
+        let (left, right, offset) = doc.find_pos(5);
+        assert_eq!(left, None);
+        assert_eq!(right, None);
+        assert_eq!(offset, 0);
+
+        // Position 10 should be at the start 
+        let (left, right, offset) = doc.find_pos(10);
+        assert_eq!(left, None);
+        assert_eq!(right, None);
+        assert_eq!(offset, 0);
+
+        // Position 15 should be at the start 
+        let (left, right, offset) = doc.find_pos(15);
+        assert_eq!(left, None);
+        assert_eq!(right, None);
+        assert_eq!(offset, 0);
+    }
 }
