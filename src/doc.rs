@@ -136,6 +136,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn next_id_clocks_remain_in_sync() {
+        let mut doc = Doc::new(1);
+        let next_id = doc.next_id();
+        assert!(next_id.clock == doc.clock);
+        assert!(next_id.client == doc.client_id);
+    }
+
+    #[test]
     fn find_pos_in_empty_doc() {
         let doc = Doc::new(1);
         let (left, right) = doc.find_pos(0);
