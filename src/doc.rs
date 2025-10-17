@@ -124,7 +124,12 @@ impl<R: ConflictResolver> Crdt for Doc<R> {
 
 impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
     fn insert(&mut self, pos: usize, text: &str) {
-        let (left_id, right_id, offset) = self.find_pos(pos);
+        // find_pos
+        // Handle splitting the right item if insertion is inside it
+        // next_id
+        // Create the new item
+        // Update links
+        // Update state vector?
     }
     fn delete(&mut self, pos: usize, len: usize) {}
     fn value(&self) -> String {
