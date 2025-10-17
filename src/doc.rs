@@ -61,24 +61,24 @@ impl<R: ConflictResolver> Doc<R> {
             clock: self.clock,
         };
         self.clock += 1;
-        id 
+        id
     }
 
     /// Finds the insertion position in the linked list for a given character position.
     ///
-    /// Traverses the list while skipping deleted items, returning the IDs of the
-    /// items that should surround the insertion point and the offset at which the
-    /// insertion should occur in the Item if it requires splitting
+    /// Returns the neighboring items and offset for where to insert. If `offset > 0`,
+    /// the `right` item should be split at that offset.
     ///
     /// # Arguments
     ///
-    /// * `pos` - The character position where insertion should occur (0-indexed)
+    /// * `pos` - The 0-indexed character position for insertion
     ///
     /// # Returns
     ///
-    /// A tuple `(left, right, right)` where `left` is the item before the insertion point
-    /// and `right` is the item at or after it. Either can be `None` if inserting at
-    /// the beginning or end of the list.
+    /// `(left, right, offset)`:
+    /// * `left` - Item before insertion point, or `None` if at start
+    /// * `right` - Item at/after insertion point, or `None` if at end  
+    /// * `offset` - Characters into `right` item (0 = before, >0 = split here)
     fn find_pos(&self, pos: usize) -> (Option<ID>, Option<ID>, usize) {
         let mut index = 0;
         let mut left = None;
@@ -138,7 +138,6 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
 mod tests {
     use super::*;
 
-
     #[test]
     fn next_id_clock_starts_at_0() {
         let mut doc = Doc::new(1);
@@ -187,7 +186,7 @@ mod tests {
         let mut doc = Doc::new(1);
         let first_id = doc.next_id();
         doc.insert_test_item(Item {
-            id: first_id ,
+            id: first_id,
             left: None,
             right: None,
             content: "Hello world!".to_owned(),
@@ -204,7 +203,7 @@ mod tests {
         let mut doc = Doc::new(1);
         let first_id = doc.next_id();
         doc.insert_test_item(Item {
-            id: first_id ,
+            id: first_id,
             left: None,
             right: None,
             content: "This is all one item!".to_owned(),
@@ -220,7 +219,7 @@ mod tests {
 
     #[test]
     fn find_pos_between_items() {
-         let mut doc = Doc::new(1);
+        let mut doc = Doc::new(1);
         let first_id = doc.next_id();
         let second_id = doc.next_id();
         doc.insert_test_item(Item {
@@ -236,7 +235,6 @@ mod tests {
             right: None,
             content: "Second Item".to_owned(),
             is_deleted: false,
-
         });
 
         let (left, right, offset) = doc.find_pos(10);
