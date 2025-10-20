@@ -127,6 +127,9 @@ impl<R: ConflictResolver> Crdt for Doc<R> {
 
 impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
     fn insert(&mut self, pos: usize, text: &str) {
+        if text.is_empty() {
+            return;
+        }
         let (mut left_id, right_id, offset) = self.find_pos(pos);
 
         // Handle splitting the right item if insertion is inside it
@@ -134,7 +137,7 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
             if offset > 0 {
 
                 let right_item = self.items.get(&rid).unwrap();
-                let right_item_left_id = right_item.left.clone();
+                let right_item_left_id = right_item.left;
 
                 // Could use a drain to avoid alloc, but we can't rely on byte offset for UTF-8
                 // content
@@ -191,6 +194,7 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
             self.items.get_mut(&rid).unwrap().left = Some(new_id);
         }
     }
+
     fn delete(&mut self, pos: usize, len: usize) {}
     fn value(&self) -> String {
         "TODO".into()
