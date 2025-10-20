@@ -130,8 +130,44 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
         let (mut left_id, right_id, offset) = self.find_pos(pos);
 
         // Handle splitting the right item if insertion is inside it
-        // split logic
+        if let Some(rid) = right_id {
+            if offset > 0 {
 
+                let right_item = self.items.get(&rid).unwrap();
+                let right_item_left_id = right_item.left.clone();
+
+                // Could use a drain to avoid alloc, but we can't rely on byte offset for UTF-8
+                // content
+                let mut right_chars = right_item.content.chars();
+                let left_content: String = right_chars.by_ref().take(offset).collect();
+                let right_content: String = right_chars.collect();
+
+                let left_split_id = self.next_id(&left_content);
+                let left_split = Item {
+                    id: left_split_id,
+                    left: right_item_left_id,
+                    right: Some(rid),
+                    content: left_content,
+                    is_deleted: false,
+                };
+
+                // Update the original right item
+                let right_item_mut = self.items.get_mut(&rid).unwrap();
+                right_item_mut.content = right_content;
+                right_item_mut.left = Some(left_split_id);
+
+                self.items.insert(left_split_id, left_split);
+
+                // Update previous item's right pointer or head
+                if let Some(prev_left_id) = right_item_left_id {
+                    self.items.get_mut(&prev_left_id).unwrap().right = Some(left_split_id);
+                } else {
+                    self.head = Some(left_split_id);
+                }
+
+                left_id = Some(left_split_id);
+            }
+        }
 
         let new_id = self.next_id(text); 
         let new_item = Item {
@@ -144,14 +180,16 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
 
         self.items.insert(new_id, new_item);
 
-
-
-        // find_pos
-        // Handle splitting the right item if insertion is inside it
-        // next_id
-        // Create the new item
         // Update links
-        // Update state vector?
+        if let Some(lid) = left_id {
+            self.items.get_mut(&lid).unwrap().right = Some(new_id);
+        } else {
+            self.head = Some(new_id);
+        }
+
+        if let Some(rid) = right_id {
+            self.items.get_mut(&rid).unwrap().left = Some(new_id);
+        }
     }
     fn delete(&mut self, pos: usize, len: usize) {}
     fn value(&self) -> String {

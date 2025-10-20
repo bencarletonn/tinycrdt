@@ -1,6 +1,6 @@
 use crate::id::ID;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Item {
     pub id: ID,
     pub left: Option<ID>,
