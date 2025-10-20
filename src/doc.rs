@@ -491,4 +491,99 @@ mod tests {
         assert_eq!(right, None);
         assert_eq!(offset, 0);
     }
+
+    #[test]
+    fn test_iterator_empty_doc() {
+        let doc = Doc::new(1);
+        let mut iter = doc.into_iter();
+        
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_iterator_single_item() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        
+        let items: Vec<&Item> = doc.into_iter().collect();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].content, "hello");
+        assert_eq!(items[0].id.clock, 0);
+    }
+
+    #[test]
+    fn iterator_empty_doc() {
+        let doc = Doc::new(1);
+        let items: Vec<&Item> = doc.into_iter().collect();
+        assert_eq!(items.len(), 0);
+    }
+
+    #[test]
+    fn iterator_single_item() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        
+        let items: Vec<&Item> = doc.into_iter().collect();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].content, "hello");
+    }
+
+    #[test]
+    fn iterator_multiple_items() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        doc.insert(5, " ");
+        doc.insert(6, "world");
+        
+        let items: Vec<&Item> = doc.into_iter().collect();
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].content, "hello");
+        assert_eq!(items[1].content, " ");
+        assert_eq!(items[2].content, "world");
+    }
+
+    #[test]
+    fn iterator_skips_deleted_items() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        doc.insert(5, " ");
+        doc.insert(6, "world");
+        
+        // Mark the middle item as deleted
+        let space_id = doc.items.iter()
+            .find(|(_, item)| item.content == " ")
+            .map(|(id, _)| *id)
+            .unwrap();
+        doc.items.get_mut(&space_id).unwrap().is_deleted = true;
+        
+        let items: Vec<&Item> = doc.into_iter().collect();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].content, "hello");
+        assert_eq!(items[1].content, "world");
+    }
+
+    #[test]
+    fn value_uses_iterator() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        doc.insert(5, " ");
+        doc.insert(6, "world");
+        
+        assert_eq!(doc.value(), "hello world");
+    }
+
+    #[test]
+    fn iterator_after_split() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        doc.insert(2, "X");  // Splits "hello" into "he", "X", "llo"
+        
+        let items: Vec<&Item> = doc.into_iter().collect();
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].content, "he");
+        assert_eq!(items[1].content, "X");
+        assert_eq!(items[2].content, "llo");
+    }
+
+
 }
