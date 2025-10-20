@@ -24,16 +24,6 @@ impl Doc<YataResolver> {
             resolver: YataResolver,
         }
     }
-
-    /// Minimal helper to insert a linked item sequence manually.
-    /// TODO: remove this when `apply()` is available.
-    fn insert_test_item(&mut self, item: Item) {
-        let id = item.id;
-        if self.head.is_none() {
-            self.head = Some(id);
-        }
-        self.items.insert(id, item);
-    }
 }
 
 impl<R: ConflictResolver> Doc<R> {
@@ -287,16 +277,7 @@ mod tests {
     fn find_pos_at_start() {
         let mut doc = Doc::new(1);
 
-        doc.insert_test_item(Item {
-            id: ID {
-                client: 1,
-                clock: 0,
-            },
-            left: doc.head,
-            right: None,
-            content: "hello".to_owned(),
-            is_deleted: false,
-        });
+        doc.insert(0, "hello");
 
         let (left, right, offset) = doc.find_pos(0);
         assert!(left.is_none());
@@ -307,16 +288,8 @@ mod tests {
     #[test]
     fn find_pos_at_end() {
         let mut doc = Doc::new(1);
-        let content = "Hello world!";
-        let first_id = doc.next_id(&content);
 
-        doc.insert_test_item(Item {
-            id: first_id,
-            left: None,
-            right: None,
-            content: content.to_owned(),
-            is_deleted: false,
-        });
+        doc.insert(0, "Hello world!");
 
         let (left, right, _) = doc.find_pos(12);
         assert!(left.is_some());
@@ -326,16 +299,8 @@ mod tests {
     #[test]
     fn find_pos_in_middle_of_item() {
         let mut doc = Doc::new(1);
-        let content = "This is all one item!";
-        let first_id = doc.next_id(content);
 
-        doc.insert_test_item(Item {
-            id: first_id,
-            left: None,
-            right: None,
-            content: content.to_owned(),
-            is_deleted: false,
-        });
+        doc.insert(0, "This is all one item!");
 
         // Position 5 should have one item to the right, with
         // an offset of 5, indicating the right item will need
@@ -349,25 +314,9 @@ mod tests {
     #[test]
     fn find_pos_between_items() {
         let mut doc = Doc::new(1);
-        let first_content = "First Item";
-        let first_id = doc.next_id(first_content);
-        let second_content = "Second Item";
-        let second_id = doc.next_id(second_content);
 
-        doc.insert_test_item(Item {
-            id: first_id,
-            left: None,
-            right: Some(second_id),
-            content: first_content.to_owned(),
-            is_deleted: false,
-        });
-        doc.insert_test_item(Item {
-            id: second_id,
-            left: Some(first_id),
-            right: None,
-            content: second_content.to_owned(),
-            is_deleted: false,
-        });
+        doc.insert(0, "First Item");
+        doc.insert(10, "Second Item");
 
         let (left, right, offset) = doc.find_pos(10);
         assert_eq!(left, Some(id(1, 0)));
@@ -378,25 +327,16 @@ mod tests {
     #[test]
     fn find_pos_skips_deleted_items() {
         let mut doc = Doc::new(1);
-        let first_content = "First Item";
-        let first_id = doc.next_id(first_content);
-        let second_content = "Second Item";
-        let second_id = doc.next_id(second_content);
 
-        doc.insert_test_item(Item {
-            id: first_id,
-            left: None,
-            right: Some(second_id),
-            content: first_content.to_owned(),
-            is_deleted: false,
-        });
-        doc.insert_test_item(Item {
-            id: second_id,
-            left: Some(first_id),
-            right: None,
-            content: second_content.to_owned(),
-            is_deleted: true,
-        });
+        doc.insert(0, "First Item");
+        doc.insert(10, "Second Item");
+
+        // Mark the middle item as deleted
+        let space_id = doc.items.iter()
+            .find(|(_, item)| item.content == "Second Item")
+            .map(|(id, _)| *id)
+            .unwrap();
+        doc.items.get_mut(&space_id).unwrap().is_deleted = true;
 
         // Position 10 should be right to the first item
         let (left, right, offset) = doc.find_pos(10);
@@ -408,25 +348,9 @@ mod tests {
     #[test]
     fn test_find_pos_with_unicode() {
         let mut doc = Doc::new(1);
-        let first_content = "hello";
-        let first_id = doc.next_id(first_content);
-        let second_content = "🦀🦀";
-        let second_id = doc.next_id(second_content);
 
-        doc.insert_test_item(Item {
-            id: first_id,
-            left: None,
-            right: Some(second_id),
-            content: first_content.to_owned(),
-            is_deleted: false,
-        });
-        doc.insert_test_item(Item {
-            id: second_id,
-            left: Some(first_id),
-            right: None,
-            content: second_content.to_owned(),
-            is_deleted: false,
-        });
+        doc.insert(0, "hello");
+        doc.insert(5, "🦀🦀");
 
         // Position 6 should be in the emoji item
         let (left, right, offset) = doc.find_pos(6);
@@ -444,34 +368,14 @@ mod tests {
     #[test]
     fn find_pos_all_items_deleted() {
         let mut doc = Doc::new(1);
-        let first_content = "First Item";
-        let first_id = doc.next_id(first_content);
-        let second_content = "Second Item";
-        let second_id = doc.next_id(second_content);
-        let third_content = "Third Item";
-        let third_id = doc.next_id(third_content);
 
-        doc.insert_test_item(Item {
-            id: first_id,
-            left: None,
-            right: Some(second_id),
-            content: first_content.to_owned(),
-            is_deleted: true,
-        });
-        doc.insert_test_item(Item {
-            id: second_id,
-            left: Some(first_id),
-            right: Some(third_id),
-            content: second_content.to_owned(),
-            is_deleted: true,
-        });
-        doc.insert_test_item(Item {
-            id: third_id,
-            left: Some(second_id),
-            right: None,
-            content: third_content.to_owned(),
-            is_deleted: true,
-        });
+        doc.insert(0, "First Item");
+        doc.insert(10, "Second Item");
+        doc.insert(21, "Third Iten");
+
+        for (_, item) in doc.items.iter_mut() {
+            item.is_deleted = true;
+        }
 
         // Position 5 should be at the start
         let (left, right, offset) = doc.find_pos(5);
