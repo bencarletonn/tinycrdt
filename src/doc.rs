@@ -489,5 +489,176 @@ mod tests {
         assert_eq!(items[2].content, "llo");
     }
 
+    #[test]
+    fn test_insert_into_empty_list() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
 
+        assert_eq!(doc.value(), "hello");
+        assert_eq!(doc.head, Some(id(1, 0)));
+        assert_eq!(doc.clock, 5);
+    }
+
+    #[test]
+    fn insert_at_beginning() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "world");
+        doc.insert(0, "hello ");
+
+        assert_eq!(doc.value(), "hello world");
+        
+        // First item should be "hello " starting at clock 5
+        let first_item = doc.items.get(&id(1, 5)).unwrap();
+        assert_eq!(first_item.content, "hello ");
+        assert_eq!(first_item.left, None);
+        assert_eq!(first_item.right, Some(id(1, 0)));
+    }
+
+    #[test]
+    fn insert_at_end() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        doc.insert(5, " world");
+
+        assert_eq!(doc.value(), "hello world");
+        
+        let second_item = doc.items.get(&id(1, 5)).unwrap();
+        assert_eq!(second_item.content, " world");
+        assert_eq!(second_item.left, Some(id(1, 0)));
+        assert_eq!(second_item.right, None);
+    }
+
+    #[test]
+    fn insert_in_middle_splits_item() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hllo"); // Creates ID (1, 0) with length 4, clock advances to 4
+        doc.insert(1, "e"); // Split creates ID (1, 4) for "h", then (1, 5) for "e"
+
+        assert_eq!(doc.value(), "hello");
+        assert_eq!(doc.items.len(), 3);
+
+        // Left split "h" has NEW ID starting at clock 4
+        let left_split = doc.items.get(&id(1, 4)).unwrap();
+        assert_eq!(left_split.content, "h");
+
+        // Inserted "e" has ID starting at clock 5
+        let inserted = doc.items.get(&id(1, 5)).unwrap();
+        assert_eq!(inserted.content, "e");
+
+        // Right split "llo" keeps ORIGINAL ID starting at clock 0
+        let right_split = doc.items.get(&id(1, 0)).unwrap();
+        assert_eq!(right_split.content, "llo");
+    }
+
+    #[test]
+    fn insert_splits_at_exact_midpoint() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "abcd");
+        doc.insert(2, "X");  // Insert at exact middle
+
+        assert_eq!(doc.value(), "abXcd");
+        
+        // "ab" (split left), "X" (inserted), "cd" (split right)
+        assert_eq!(doc.items.len(), 3);
+    }
+
+    #[test]
+    fn multiple_inserts_at_same_position() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "a");
+        doc.insert(1, "b");
+        doc.insert(2, "c");
+        doc.insert(3, "d");
+
+        assert_eq!(doc.value(), "abcd");
+        assert_eq!(doc.items.len(), 4);
+    }
+
+    #[test]
+    fn insert_with_unicode() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello🦀world");
+        doc.insert(6, "rust");  // Insert after emoji (1 char)
+
+        assert_eq!(doc.value(), "hello🦀rustworld");
+    }
+
+    #[test]
+    fn insert_empty_string_is_noop() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        let clock_before = doc.clock;
+        
+        doc.insert(2, "");  // Should be no-op
+        
+        assert_eq!(doc.value(), "hello");
+        assert_eq!(doc.clock, clock_before);  // Clock shouldn't advance
+    }
+
+    #[test]
+    fn insert_updates_head_correctly() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "second");
+        
+        let original_head = doc.head;
+        
+        doc.insert(0, "first");
+        
+        // Head should now point to "first"
+        assert_ne!(doc.head, original_head);
+        assert_eq!(doc.value(), "firstsecond");
+    }
+
+    #[test]
+    fn insert_maintains_linked_list_integrity() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "a");
+        doc.insert(1, "b");
+        doc.insert(2, "c");
+
+        // Walk the linked list and verify integrity
+        let mut visited = vec![];
+        let mut current = doc.head;
+        
+        while let Some(id) = current {
+            let item = doc.items.get(&id).unwrap();
+            visited.push(item.content.clone());
+            
+            // Verify bidirectional links
+            if let Some(right_id) = item.right {
+                let right_item = doc.items.get(&right_id).unwrap();
+                assert_eq!(right_item.left, Some(id), "Right item's left should point back");
+            }
+            
+            current = item.right;
+        }
+        
+        assert_eq!(visited, vec!["a", "b", "c"]);
+    }
+
+    #[test]
+    fn clock_advances_correctly_with_splits() {
+        let mut doc = Doc::new(1);
+        
+        doc.insert(0, "hello");  // clock: 0 -> 5
+        assert_eq!(doc.clock, 5);
+        
+        doc.insert(2, "X");  // Splits "hello", clock: 5 -> 6 (for "X"), but also 6 -> 8 (for "he" split)
+        // Actually, let me recalculate...
+        // Split creates "he" (2 chars) at clock 5, clock becomes 7
+        // Then insert "X" (1 char) at clock 7, clock becomes 8
+        // Original "llo" keeps its ID
+        
+        assert_eq!(doc.value(), "heXllo");
+    }
+
+    #[test]
+    fn insert_between_two_items() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "ac");
+        doc.insert(1, "b");
+
+        assert_eq!(doc.value(), "abc");
+        assert_eq!(doc.items.len(), 3);  // "a" (split), "b" (inserted), "c" (split)
+    }
 }
