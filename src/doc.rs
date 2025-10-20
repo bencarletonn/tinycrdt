@@ -111,7 +111,38 @@ impl<R: ConflictResolver> Doc<R> {
     fn resolve_pending(&mut self) {}
 }
 
-// impl Iter
+pub struct DocIterator<'a, R: ConflictResolver> {
+    doc: &'a Doc<R>,
+    current: Option<ID>,
+}
+
+impl<'a, R: ConflictResolver> IntoIterator for &'a Doc<R> {
+    type Item = &'a Item;
+    type IntoIter = DocIterator<'a, R>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        DocIterator {
+            doc: self,
+            current: self.head,
+        }
+    }
+}
+
+impl<'a, R: ConflictResolver> Iterator for DocIterator<'a, R> {
+    type Item = &'a Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(id) = self.current {
+            let item = self.doc.items.get(&id).unwrap();
+            self.current = item.right;
+
+            if !item.is_deleted {
+                return Some(item);
+            }
+        }
+        None
+    }
+}
 
 impl<R: ConflictResolver> Crdt for Doc<R> {
     type Update = Vec<Item>;
@@ -135,7 +166,6 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
         // Handle splitting the right item if insertion is inside it
         if let Some(rid) = right_id {
             if offset > 0 {
-
                 let right_item = self.items.get(&rid).unwrap();
                 let right_item_left_id = right_item.left;
 
@@ -172,7 +202,7 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
             }
         }
 
-        let new_id = self.next_id(text); 
+        let new_id = self.next_id(text);
         let new_item = Item {
             id: new_id,
             left: left_id,
@@ -196,8 +226,9 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
     }
 
     fn delete(&mut self, pos: usize, len: usize) {}
+
     fn value(&self) -> String {
-        "TODO".into()
+        self.into_iter().map(|item| item.content.as_str()).collect()
     }
 }
 
