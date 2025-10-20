@@ -54,13 +54,14 @@ impl<R: ConflictResolver> Doc<R> {
     /// Returns an [`ID`] with the current clock value, then advances the clock
     /// by the character count of `text`.
     fn next_id(&mut self, text: &str) -> ID {
+        debug_assert!(!text.is_empty(), "next_id called with empty text");
+
         let id = ID {
             client: self.client_id,
             clock: self.clock,
         };
-        // State Vector stores the last clock value used, not the next available
-        self.state_vector.insert(self.client_id, self.clock);
         self.clock += text.chars().count() as u64;
+        self.state_vector.insert(self.client_id, self.clock - 1);
         id
     }
 
@@ -170,7 +171,7 @@ mod tests {
     #[test]
     fn next_id_clock_starts_at_0() {
         let mut doc = Doc::new(1);
-        let next_id = doc.next_id("");
+        let next_id = doc.next_id("abc");
 
         assert!(next_id.clock == 0);
     }
@@ -185,13 +186,18 @@ mod tests {
     }
 
     #[test]
-    fn next_id_state_vector_1_less_than_clock() {
+    fn next_id_updates_state_vector_to_last_used_clock() {
         let mut doc = Doc::new(1);
         let next_id = doc.next_id("hello");
 
+        assert_eq!(next_id.clock, 0);
+
+        assert_eq!(doc.clock, 5);
+
         // State vector stores last clock value used, not the next available
-        let state_vector = doc.state_vector.get(&1).unwrap();
-        assert_ne!(&doc.clock, state_vector)
+        let state = doc.state_vector.get(&1).unwrap();
+        assert_eq!(*state, 4);
+        assert_eq!(*state, doc.clock - 1);
     }
 
     #[test]
