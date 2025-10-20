@@ -58,6 +58,8 @@ impl<R: ConflictResolver> Doc<R> {
             client: self.client_id,
             clock: self.clock,
         };
+        // State Vector stores the last clock value used, not the next available
+        self.state_vector.insert(self.client_id, self.clock);
         self.clock += text.chars().count() as u64;
         id
     }
@@ -124,6 +126,25 @@ impl<R: ConflictResolver> Crdt for Doc<R> {
 
 impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
     fn insert(&mut self, pos: usize, text: &str) {
+        let (mut left_id, right_id, offset) = self.find_pos(pos);
+
+        // Handle splitting the right item if insertion is inside it
+        // split logic
+
+
+        let new_id = self.next_id(text); 
+        let new_item = Item {
+            id: new_id,
+            left: left_id,
+            right: right_id,
+            content: text.to_string(),
+            is_deleted: false,
+        };
+
+        self.items.insert(new_id, new_item);
+
+
+
         // find_pos
         // Handle splitting the right item if insertion is inside it
         // next_id
@@ -161,6 +182,16 @@ mod tests {
 
         assert_eq!(doc.clock, 3);
         assert!(next_id.clock == doc.clock - 3);
+    }
+
+    #[test]
+    fn next_id_state_vector_1_less_than_clock() {
+        let mut doc = Doc::new(1);
+        let next_id = doc.next_id("hello");
+
+        // State vector stores last clock value used, not the next available
+        let state_vector = doc.state_vector.get(&1).unwrap();
+        assert_ne!(&doc.clock, state_vector)
     }
 
     #[test]
