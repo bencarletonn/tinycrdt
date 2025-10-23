@@ -96,6 +96,55 @@ impl<R: ConflictResolver> Doc<R> {
         (left, None, 0)
     }
 
+    /// Splits an item at the given offset, creating a new item for the left part.
+    /// Returns the ID of the newly created left split item.
+    ///
+    /// # Arguments
+    ///
+    /// * `item_id` - The ID of the item to split
+    /// * `offset` - The character offset at which to split (0 < offset < item length)
+    ///
+    /// # Returns
+    ///
+    /// The ID of the newly created left split item. The original item retains
+    /// its ID but its content is updated to contain only the right part.
+    fn split_item(&mut self, item_id: ID, offset: usize) -> ID {
+        let item = self.items.get(&item_id).unwrap();
+        let item_left = item.left;
+
+        // Split the content
+        let mut chars = item.content.chars();
+        let left_content: String = chars.by_ref().take(offset).collect();
+        let right_content: String = chars.collect();
+
+        // Create new left split item
+        let left_split_id = self.next_id(&left_content);
+        let left_split = Item {
+            id: left_split_id,
+            left: item_left,
+            right: Some(item_id),
+            content: left_content,
+            is_deleted: false,
+        };
+
+        // Update the original item (now the right part)
+        let item_mut = self.items.get_mut(&item_id).unwrap();
+        item_mut.content = right_content;
+        item_mut.left = Some(left_split_id);
+
+        // Insert the left split
+        self.items.insert(left_split_id, left_split);
+
+        // Update the previous item's right pointer or head
+        if let Some(prev_id) = item_left {
+            self.items.get_mut(&prev_id).unwrap().right = Some(left_split_id);
+        } else {
+            self.head = Some(left_split_id);
+        }
+
+        left_split_id
+    }
+
     fn try_link(&mut self, item: Item) {}
     fn link(&mut self, item: Item) {}
     fn resolve_pending(&mut self) {}
@@ -156,39 +205,7 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
         // Handle splitting the right item if insertion is inside it
         if let Some(rid) = right_id {
             if offset > 0 {
-                let right_item = self.items.get(&rid).unwrap();
-                let right_item_left_id = right_item.left;
-
-                // Could use a drain to avoid alloc, but we can't rely on byte offset for UTF-8
-                // content
-                let mut right_chars = right_item.content.chars();
-                let left_content: String = right_chars.by_ref().take(offset).collect();
-                let right_content: String = right_chars.collect();
-
-                let left_split_id = self.next_id(&left_content);
-                let left_split = Item {
-                    id: left_split_id,
-                    left: right_item_left_id,
-                    right: Some(rid),
-                    content: left_content,
-                    is_deleted: false,
-                };
-
-                // Update the original right item
-                let right_item_mut = self.items.get_mut(&rid).unwrap();
-                right_item_mut.content = right_content;
-                right_item_mut.left = Some(left_split_id);
-
-                self.items.insert(left_split_id, left_split);
-
-                // Update previous item's right pointer or head
-                if let Some(prev_left_id) = right_item_left_id {
-                    self.items.get_mut(&prev_left_id).unwrap().right = Some(left_split_id);
-                } else {
-                    self.head = Some(left_split_id);
-                }
-
-                left_id = Some(left_split_id);
+                left_id = Some(self.split_item(rid, offset));
             }
         }
 
