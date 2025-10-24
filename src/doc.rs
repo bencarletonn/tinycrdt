@@ -232,6 +232,16 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
         }
     }
 
+    /// Deletes a range of characters starting at `pos` with length `len`.
+    ///
+    /// Items within the deletion range are marked as deleted. If deletion starts or
+    /// ends mid-item, the item is split first. Deleted items remain in the structure
+    /// but are skipped during iteration.
+    ///
+    /// # Arguments
+    ///
+    /// * `pos` - Starting character position (0-indexed)
+    /// * `len` - Number of characters to delete
     fn delete(&mut self, pos: usize, len: usize) {
         if len == 0 {
             return;
