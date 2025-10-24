@@ -720,4 +720,289 @@ mod tests {
         assert_eq!(doc.value(), "abc");
         assert_eq!(doc.items.len(), 3);  // "a" (split), "b" (inserted), "c" (split)
     }
+
+    #[test]
+    fn delete_empty_length_is_noop() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        
+        doc.delete(0, 0);
+        
+        assert_eq!(doc.value(), "hello");
+    }
+
+    #[test]
+    fn delete_single_complete_item() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        
+        doc.delete(0, 5);
+        
+        assert_eq!(doc.value(), "");
+        
+        // Item should still exist but marked as deleted
+        let item = doc.items.get(&id(1, 0)).unwrap();
+        assert!(item.is_deleted);
+    }
+
+    #[test]
+    fn delete_from_start_of_item() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        
+        doc.delete(0, 2);  // Delete "he"
+        
+        assert_eq!(doc.value(), "llo");
+    }
+
+    #[test]
+    fn delete_from_middle_of_item() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        
+        doc.delete(1, 2);  // Delete "el"
+        
+        assert_eq!(doc.value(), "hlo");
+    }
+
+    #[test]
+    fn delete_from_end_of_item() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        
+        doc.delete(3, 2);  // Delete "lo"
+        
+        assert_eq!(doc.value(), "hel");
+    }
+
+    #[test]
+    fn delete_single_character() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        
+        doc.delete(2, 1);  // Delete just 'l'
+        
+        assert_eq!(doc.value(), "helo");
+    }
+
+    #[test]
+    fn delete_across_multiple_items() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        doc.insert(5, " ");
+        doc.insert(6, "world");
+        
+        doc.delete(3, 5);  // Delete "lo w" across three items
+        
+        assert_eq!(doc.value(), "helrld");
+    }
+
+    #[test]
+    fn delete_multiple_complete_items() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "a");
+        doc.insert(1, "b");
+        doc.insert(2, "c");
+        doc.insert(3, "d");
+        
+        doc.delete(1, 2);  // Delete "bc"
+        
+        assert_eq!(doc.value(), "ad");
+    }
+
+    #[test]
+    fn delete_all_content() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        doc.insert(5, " ");
+        doc.insert(6, "world");
+        
+        doc.delete(0, 11);
+        
+        assert_eq!(doc.value(), "");
+    }
+
+    #[test]
+    fn delete_skips_already_deleted_items() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "abc");
+        
+        // Delete "b"
+        doc.delete(1, 1);
+        assert_eq!(doc.value(), "ac");
+        
+        // Delete "a" - should work even though middle item is deleted
+        doc.delete(0, 1);
+        assert_eq!(doc.value(), "c");
+    }
+
+    #[test]
+    fn delete_with_unicode() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello🦀world");
+        
+        doc.delete(5, 1);  // Delete the crab emoji
+        
+        assert_eq!(doc.value(), "helloworld");
+    }
+
+    #[test]
+    fn delete_unicode_character_in_middle() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "a🦀b🦀c");
+        
+        doc.delete(2, 1);  // Delete 'b'
+        
+        assert_eq!(doc.value(), "a🦀🦀c");
+    }
+
+    #[test]
+    fn delete_beyond_content_length() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        
+        doc.delete(0, 100);  // Try to delete more than exists
+        
+        assert_eq!(doc.value(), "");
+    }
+
+    #[test]
+    fn delete_at_position_beyond_content() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        
+        doc.delete(10, 5);  // Start position beyond content
+        
+        assert_eq!(doc.value(), "hello");  // Should be unchanged
+    }
+
+    #[test]
+    fn delete_then_insert() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello world");
+        
+        doc.delete(5, 6);  // Delete " world"
+        assert_eq!(doc.value(), "hello");
+        
+        doc.insert(5, " rust");
+        assert_eq!(doc.value(), "hello rust");
+    }
+
+    #[test]
+    fn insert_then_delete_then_insert() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        doc.delete(2, 2);  // Delete "ll" -> "heo"
+        assert_eq!(doc.value(), "heo");
+        
+        doc.insert(2, "y");  // Insert "y" -> "heyo"
+        assert_eq!(doc.value(), "heyo");
+    }
+
+    #[test]
+    fn multiple_sequential_deletes() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "abcdef");
+        
+        doc.delete(1, 1);  // Delete 'b' -> "acdef"
+        assert_eq!(doc.value(), "acdef");
+        
+        doc.delete(2, 1);  // Delete 'd' -> "acef"
+        assert_eq!(doc.value(), "acef");
+        
+        doc.delete(1, 1);  // Delete 'c' -> "aef"
+        assert_eq!(doc.value(), "aef");
+    }
+
+    #[test]
+    fn delete_creates_item_splits() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello");
+        let initial_items = doc.items.len();
+        
+        doc.delete(1, 3);  // Delete "ell" from middle
+        
+        assert_eq!(doc.value(), "ho");
+        // Should have created splits
+        assert!(doc.items.len() > initial_items);
+    }
+
+    #[test]
+    fn delete_at_item_boundaries() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "abc");
+        doc.insert(3, "def");
+        doc.insert(6, "ghi");
+        
+        // Delete exactly the middle item
+        doc.delete(3, 3);
+        
+        assert_eq!(doc.value(), "abcghi");
+    }
+
+    #[test]
+    fn delete_spanning_item_boundaries() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "abc");
+        doc.insert(3, "def");
+        doc.insert(6, "ghi");
+        
+        // Delete from middle of first to middle of last
+        doc.delete(1, 7);  // Delete "bcdefgh"
+        
+        assert_eq!(doc.value(), "ai");
+    }
+
+    #[test]
+    fn delete_everything_except_first_char() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello world");
+        
+        doc.delete(1, 10);
+        
+        assert_eq!(doc.value(), "h");
+    }
+
+    #[test]
+    fn delete_everything_except_last_char() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "hello world");
+        
+        doc.delete(0, 10);
+        
+        assert_eq!(doc.value(), "d");
+    }
+
+    #[test]
+    fn delete_maintains_linked_list_integrity() {
+        let mut doc = Doc::new(1);
+        doc.insert(0, "abcde");
+        
+        doc.delete(1, 3);  // Delete "bcd"
+        
+        // Walk the linked list
+        let mut result = String::new();
+        let mut current = doc.head;
+        
+        while let Some(id) = current {
+            let item = &doc.items[&id];
+            if !item.is_deleted {
+                result.push_str(&item.content);
+            }
+            current = item.right;
+        }
+        
+        assert_eq!(result, "ae");
+        assert_eq!(doc.value(), "ae");
+    }
+
+    #[test]
+    fn delete_empty_document() {
+        let mut doc = Doc::new(1);
+        
+        doc.delete(0, 5);  // Try to delete from empty doc
+        
+        assert_eq!(doc.value(), "");
+    }
+
 }
