@@ -232,7 +232,60 @@ impl<R: ConflictResolver> SequenceCrdt for Doc<R> {
         }
     }
 
-    fn delete(&mut self, pos: usize, len: usize) {}
+    fn delete(&mut self, pos: usize, len: usize) {
+        if len == 0 {
+            return;
+        }
+
+        let (_, start_item_id, start_offset) = self.find_pos(pos);
+        let Some(mut current_id) = start_item_id else {
+            return;
+        };
+
+        let mut remaining = len;
+
+        // If deletion starts in the middle of an item, split it first
+        if start_offset > 0 {
+            self.split_item(current_id, start_offset);
+        }
+
+        // Delete items moving rightward until length is covered
+        while remaining > 0 {
+            let Some(item) = self.items.get(&current_id) else {
+                break;
+            };
+
+            if item.is_deleted {
+                let Some(next) = item.right else { break };
+                current_id = next;
+                continue;
+            }
+
+            let item_len = item.content.chars().count();
+            let next = item.right;
+
+            if remaining < item_len {
+                // Partial deletion: split and mark left part deleted
+                let left_id = self.split_item(current_id, remaining);
+                self.items
+                    .get_mut(&left_id)
+                    .expect("split item should exist")
+                    .is_deleted = true;
+                break;
+            }
+
+            // Full deletion
+            self.items
+                .get_mut(&current_id)
+                .expect("item should exist")
+                .is_deleted = true;
+
+            remaining -= item_len;
+
+            let Some(next_id) = next else { break };
+            current_id = next_id;
+        }
+    }
 
     fn value(&self) -> String {
         self.into_iter().map(|item| item.content.as_str()).collect()
@@ -348,12 +401,8 @@ mod tests {
         doc.insert(0, "First Item");
         doc.insert(10, "Second Item");
 
-        // Mark the middle item as deleted
-        let space_id = doc.items.iter()
-            .find(|(_, item)| item.content == "Second Item")
-            .map(|(id, _)| *id)
-            .unwrap();
-        doc.items.get_mut(&space_id).unwrap().is_deleted = true;
+        // Mark the second item as deleted
+        doc.delete(10, 11);
 
         // Position 10 should be right to the first item
         let (left, right, offset) = doc.find_pos(10);
@@ -390,9 +439,7 @@ mod tests {
         doc.insert(10, "Second Item");
         doc.insert(21, "Third Iten");
 
-        for (_, item) in doc.items.iter_mut() {
-            item.is_deleted = true;
-        }
+        doc.delete(0, 31);
 
         // Position 5 should be at the start
         let (left, right, offset) = doc.find_pos(5);
@@ -470,12 +517,7 @@ mod tests {
         doc.insert(5, " ");
         doc.insert(6, "world");
         
-        // Mark the middle item as deleted
-        let space_id = doc.items.iter()
-            .find(|(_, item)| item.content == " ")
-            .map(|(id, _)| *id)
-            .unwrap();
-        doc.items.get_mut(&space_id).unwrap().is_deleted = true;
+        doc.delete(5, 1);
         
         let items: Vec<&Item> = doc.into_iter().collect();
         assert_eq!(items.len(), 2);
@@ -507,7 +549,7 @@ mod tests {
     }
 
     #[test]
-    fn test_insert_into_empty_list() {
+    fn insert_into_empty_list() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
 
