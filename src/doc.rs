@@ -474,7 +474,7 @@ mod tests {
     fn test_iterator_empty_doc() {
         let doc = Doc::new(1);
         let mut iter = doc.into_iter();
-        
+
         assert_eq!(iter.next(), None);
     }
 
@@ -482,7 +482,7 @@ mod tests {
     fn test_iterator_single_item() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        
+
         let items: Vec<&Item> = doc.into_iter().collect();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].content, "hello");
@@ -500,7 +500,7 @@ mod tests {
     fn iterator_single_item() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        
+
         let items: Vec<&Item> = doc.into_iter().collect();
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].content, "hello");
@@ -512,7 +512,7 @@ mod tests {
         doc.insert(0, "hello");
         doc.insert(5, " ");
         doc.insert(6, "world");
-        
+
         let items: Vec<&Item> = doc.into_iter().collect();
         assert_eq!(items.len(), 3);
         assert_eq!(items[0].content, "hello");
@@ -526,9 +526,9 @@ mod tests {
         doc.insert(0, "hello");
         doc.insert(5, " ");
         doc.insert(6, "world");
-        
+
         doc.delete(5, 1);
-        
+
         let items: Vec<&Item> = doc.into_iter().collect();
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].content, "hello");
@@ -541,7 +541,7 @@ mod tests {
         doc.insert(0, "hello");
         doc.insert(5, " ");
         doc.insert(6, "world");
-        
+
         assert_eq!(doc.value(), "hello world");
     }
 
@@ -549,8 +549,8 @@ mod tests {
     fn iterator_after_split() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        doc.insert(2, "X");  // Splits "hello" into "he", "X", "llo"
-        
+        doc.insert(2, "X"); // Splits "hello" into "he", "X", "llo"
+
         let items: Vec<&Item> = doc.into_iter().collect();
         assert_eq!(items.len(), 3);
         assert_eq!(items[0].content, "he");
@@ -575,7 +575,7 @@ mod tests {
         doc.insert(0, "hello ");
 
         assert_eq!(doc.value(), "hello world");
-        
+
         // First item should be "hello " starting at clock 5
         let first_item = doc.items.get(&id(1, 5)).unwrap();
         assert_eq!(first_item.content, "hello ");
@@ -590,7 +590,7 @@ mod tests {
         doc.insert(5, " world");
 
         assert_eq!(doc.value(), "hello world");
-        
+
         let second_item = doc.items.get(&id(1, 5)).unwrap();
         assert_eq!(second_item.content, " world");
         assert_eq!(second_item.left, Some(id(1, 0)));
@@ -623,10 +623,10 @@ mod tests {
     fn insert_splits_at_exact_midpoint() {
         let mut doc = Doc::new(1);
         doc.insert(0, "abcd");
-        doc.insert(2, "X");  // Insert at exact middle
+        doc.insert(2, "X"); // Insert at exact middle
 
         assert_eq!(doc.value(), "abXcd");
-        
+
         // "ab" (split left), "X" (inserted), "cd" (split right)
         assert_eq!(doc.items.len(), 3);
     }
@@ -647,7 +647,7 @@ mod tests {
     fn insert_with_unicode() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello🦀world");
-        doc.insert(6, "rust");  // Insert after emoji (1 char)
+        doc.insert(6, "rust"); // Insert after emoji (1 char)
 
         assert_eq!(doc.value(), "hello🦀rustworld");
     }
@@ -657,22 +657,22 @@ mod tests {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
         let clock_before = doc.clock;
-        
-        doc.insert(2, "");  // Should be no-op
-        
+
+        doc.insert(2, ""); // Should be no-op
+
         assert_eq!(doc.value(), "hello");
-        assert_eq!(doc.clock, clock_before);  // Clock shouldn't advance
+        assert_eq!(doc.clock, clock_before); // Clock shouldn't advance
     }
 
     #[test]
     fn insert_updates_head_correctly() {
         let mut doc = Doc::new(1);
         doc.insert(0, "second");
-        
+
         let original_head = doc.head;
-        
+
         doc.insert(0, "first");
-        
+
         // Head should now point to "first"
         assert_ne!(doc.head, original_head);
         assert_eq!(doc.value(), "firstsecond");
@@ -688,36 +688,40 @@ mod tests {
         // Walk the linked list and verify integrity
         let mut visited = vec![];
         let mut current = doc.head;
-        
+
         while let Some(id) = current {
             let item = doc.items.get(&id).unwrap();
             visited.push(item.content.clone());
-            
+
             // Verify bidirectional links
             if let Some(right_id) = item.right {
                 let right_item = doc.items.get(&right_id).unwrap();
-                assert_eq!(right_item.left, Some(id), "Right item's left should point back");
+                assert_eq!(
+                    right_item.left,
+                    Some(id),
+                    "Right item's left should point back"
+                );
             }
-            
+
             current = item.right;
         }
-        
+
         assert_eq!(visited, vec!["a", "b", "c"]);
     }
 
     #[test]
     fn clock_advances_correctly_with_splits() {
         let mut doc = Doc::new(1);
-        
-        doc.insert(0, "hello");  // clock: 0 -> 5
+
+        doc.insert(0, "hello"); // clock: 0 -> 5
         assert_eq!(doc.clock, 5);
-        
-        doc.insert(2, "X");  // Splits "hello", clock: 5 -> 6 (for "X"), but also 6 -> 8 (for "he" split)
+
+        doc.insert(2, "X"); // Splits "hello", clock: 5 -> 6 (for "X"), but also 6 -> 8 (for "he" split)
         // Actually, let me recalculate...
         // Split creates "he" (2 chars) at clock 5, clock becomes 7
         // Then insert "X" (1 char) at clock 7, clock becomes 8
         // Original "llo" keeps its ID
-        
+
         assert_eq!(doc.value(), "heXllo");
     }
 
@@ -728,16 +732,16 @@ mod tests {
         doc.insert(1, "b");
 
         assert_eq!(doc.value(), "abc");
-        assert_eq!(doc.items.len(), 3);  // "a" (split), "b" (inserted), "c" (split)
+        assert_eq!(doc.items.len(), 3); // "a" (split), "b" (inserted), "c" (split)
     }
 
     #[test]
     fn delete_empty_length_is_noop() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        
+
         doc.delete(0, 0);
-        
+
         assert_eq!(doc.value(), "hello");
     }
 
@@ -745,11 +749,11 @@ mod tests {
     fn delete_single_complete_item() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        
+
         doc.delete(0, 5);
-        
+
         assert_eq!(doc.value(), "");
-        
+
         // Item should still exist but marked as deleted
         let item = doc.items.get(&id(1, 0)).unwrap();
         assert!(item.is_deleted);
@@ -759,9 +763,9 @@ mod tests {
     fn delete_from_start_of_item() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        
-        doc.delete(0, 2);  // Delete "he"
-        
+
+        doc.delete(0, 2); // Delete "he"
+
         assert_eq!(doc.value(), "llo");
     }
 
@@ -769,9 +773,9 @@ mod tests {
     fn delete_from_middle_of_item() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        
-        doc.delete(1, 2);  // Delete "el"
-        
+
+        doc.delete(1, 2); // Delete "el"
+
         assert_eq!(doc.value(), "hlo");
     }
 
@@ -779,9 +783,9 @@ mod tests {
     fn delete_from_end_of_item() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        
-        doc.delete(3, 2);  // Delete "lo"
-        
+
+        doc.delete(3, 2); // Delete "lo"
+
         assert_eq!(doc.value(), "hel");
     }
 
@@ -789,9 +793,9 @@ mod tests {
     fn delete_single_character() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        
-        doc.delete(2, 1);  // Delete just 'l'
-        
+
+        doc.delete(2, 1); // Delete just 'l'
+
         assert_eq!(doc.value(), "helo");
     }
 
@@ -801,9 +805,9 @@ mod tests {
         doc.insert(0, "hello");
         doc.insert(5, " ");
         doc.insert(6, "world");
-        
-        doc.delete(3, 5);  // Delete "lo w" across three items
-        
+
+        doc.delete(3, 5); // Delete "lo w" across three items
+
         assert_eq!(doc.value(), "helrld");
     }
 
@@ -814,9 +818,9 @@ mod tests {
         doc.insert(1, "b");
         doc.insert(2, "c");
         doc.insert(3, "d");
-        
-        doc.delete(1, 2);  // Delete "bc"
-        
+
+        doc.delete(1, 2); // Delete "bc"
+
         assert_eq!(doc.value(), "ad");
     }
 
@@ -826,9 +830,9 @@ mod tests {
         doc.insert(0, "hello");
         doc.insert(5, " ");
         doc.insert(6, "world");
-        
+
         doc.delete(0, 11);
-        
+
         assert_eq!(doc.value(), "");
     }
 
@@ -836,11 +840,11 @@ mod tests {
     fn delete_skips_already_deleted_items() {
         let mut doc = Doc::new(1);
         doc.insert(0, "abc");
-        
+
         // Delete "b"
         doc.delete(1, 1);
         assert_eq!(doc.value(), "ac");
-        
+
         // Delete "a" - should work even though middle item is deleted
         doc.delete(0, 1);
         assert_eq!(doc.value(), "c");
@@ -850,9 +854,9 @@ mod tests {
     fn delete_with_unicode() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello🦀world");
-        
-        doc.delete(5, 1);  // Delete the crab emoji
-        
+
+        doc.delete(5, 1); // Delete the crab emoji
+
         assert_eq!(doc.value(), "helloworld");
     }
 
@@ -860,9 +864,9 @@ mod tests {
     fn delete_unicode_character_in_middle() {
         let mut doc = Doc::new(1);
         doc.insert(0, "a🦀b🦀c");
-        
-        doc.delete(2, 1);  // Delete 'b'
-        
+
+        doc.delete(2, 1); // Delete 'b'
+
         assert_eq!(doc.value(), "a🦀🦀c");
     }
 
@@ -870,9 +874,9 @@ mod tests {
     fn delete_beyond_content_length() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        
-        doc.delete(0, 100);  // Try to delete more than exists
-        
+
+        doc.delete(0, 100); // Try to delete more than exists
+
         assert_eq!(doc.value(), "");
     }
 
@@ -880,20 +884,20 @@ mod tests {
     fn delete_at_position_beyond_content() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        
-        doc.delete(10, 5);  // Start position beyond content
-        
-        assert_eq!(doc.value(), "hello");  // Should be unchanged
+
+        doc.delete(10, 5); // Start position beyond content
+
+        assert_eq!(doc.value(), "hello"); // Should be unchanged
     }
 
     #[test]
     fn delete_then_insert() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello world");
-        
-        doc.delete(5, 6);  // Delete " world"
+
+        doc.delete(5, 6); // Delete " world"
         assert_eq!(doc.value(), "hello");
-        
+
         doc.insert(5, " rust");
         assert_eq!(doc.value(), "hello rust");
     }
@@ -902,10 +906,10 @@ mod tests {
     fn insert_then_delete_then_insert() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
-        doc.delete(2, 2);  // Delete "ll" -> "heo"
+        doc.delete(2, 2); // Delete "ll" -> "heo"
         assert_eq!(doc.value(), "heo");
-        
-        doc.insert(2, "y");  // Insert "y" -> "heyo"
+
+        doc.insert(2, "y"); // Insert "y" -> "heyo"
         assert_eq!(doc.value(), "heyo");
     }
 
@@ -913,14 +917,14 @@ mod tests {
     fn multiple_sequential_deletes() {
         let mut doc = Doc::new(1);
         doc.insert(0, "abcdef");
-        
-        doc.delete(1, 1);  // Delete 'b' -> "acdef"
+
+        doc.delete(1, 1); // Delete 'b' -> "acdef"
         assert_eq!(doc.value(), "acdef");
-        
-        doc.delete(2, 1);  // Delete 'd' -> "acef"
+
+        doc.delete(2, 1); // Delete 'd' -> "acef"
         assert_eq!(doc.value(), "acef");
-        
-        doc.delete(1, 1);  // Delete 'c' -> "aef"
+
+        doc.delete(1, 1); // Delete 'c' -> "aef"
         assert_eq!(doc.value(), "aef");
     }
 
@@ -929,9 +933,9 @@ mod tests {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello");
         let initial_items = doc.items.len();
-        
-        doc.delete(1, 3);  // Delete "ell" from middle
-        
+
+        doc.delete(1, 3); // Delete "ell" from middle
+
         assert_eq!(doc.value(), "ho");
         // Should have created splits
         assert!(doc.items.len() > initial_items);
@@ -943,10 +947,10 @@ mod tests {
         doc.insert(0, "abc");
         doc.insert(3, "def");
         doc.insert(6, "ghi");
-        
+
         // Delete exactly the middle item
         doc.delete(3, 3);
-        
+
         assert_eq!(doc.value(), "abcghi");
     }
 
@@ -956,10 +960,10 @@ mod tests {
         doc.insert(0, "abc");
         doc.insert(3, "def");
         doc.insert(6, "ghi");
-        
+
         // Delete from middle of first to middle of last
-        doc.delete(1, 7);  // Delete "bcdefgh"
-        
+        doc.delete(1, 7); // Delete "bcdefgh"
+
         assert_eq!(doc.value(), "ai");
     }
 
@@ -967,9 +971,9 @@ mod tests {
     fn delete_everything_except_first_char() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello world");
-        
+
         doc.delete(1, 10);
-        
+
         assert_eq!(doc.value(), "h");
     }
 
@@ -977,9 +981,9 @@ mod tests {
     fn delete_everything_except_last_char() {
         let mut doc = Doc::new(1);
         doc.insert(0, "hello world");
-        
+
         doc.delete(0, 10);
-        
+
         assert_eq!(doc.value(), "d");
     }
 
@@ -987,13 +991,13 @@ mod tests {
     fn delete_maintains_linked_list_integrity() {
         let mut doc = Doc::new(1);
         doc.insert(0, "abcde");
-        
-        doc.delete(1, 3);  // Delete "bcd"
-        
+
+        doc.delete(1, 3); // Delete "bcd"
+
         // Walk the linked list
         let mut result = String::new();
         let mut current = doc.head;
-        
+
         while let Some(id) = current {
             let item = &doc.items[&id];
             if !item.is_deleted {
@@ -1001,7 +1005,7 @@ mod tests {
             }
             current = item.right;
         }
-        
+
         assert_eq!(result, "ae");
         assert_eq!(doc.value(), "ae");
     }
@@ -1009,10 +1013,9 @@ mod tests {
     #[test]
     fn delete_empty_document() {
         let mut doc = Doc::new(1);
-        
-        doc.delete(0, 5);  // Try to delete from empty doc
-        
+
+        doc.delete(0, 5); // Try to delete from empty doc
+
         assert_eq!(doc.value(), "");
     }
-
 }
